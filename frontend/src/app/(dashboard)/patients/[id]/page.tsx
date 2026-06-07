@@ -12,7 +12,8 @@ import {
   CheckCircle, 
   ChevronDown, 
   ChevronUp, 
-  ShieldAlert
+  ShieldAlert,
+  AlertTriangle
 } from "lucide-react";
 
 export default function PatientDetailPage() {
@@ -26,6 +27,7 @@ export default function PatientDetailPage() {
   const [loadingAlerts, setLoadingAlerts] = useState(true);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [resolvingAll, setResolvingAll] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchAlerts = () => {
     setLoadingAlerts(true);
@@ -40,8 +42,35 @@ export default function PatientDetailPage() {
       .finally(() => setLoadingAlerts(false));
   };
 
+  const fetchPatientData = () => {
+    fetch(`/api/patients/${patientId}`)
+      .then(res => {
+        if (!res.ok) {
+          return res.json().then(errData => {
+            throw new Error(errData.error || `HTTP error! Status: ${res.status}`);
+          }).catch(() => {
+            throw new Error(`HTTP error! Status: ${res.status}`);
+          });
+        }
+        return res.json();
+      })
+      .then(data => {
+        if (data && !data.error) {
+          setPatient(data);
+          setError(null);
+        } else {
+          throw new Error(data?.error || "Failed to load patient profile data");
+        }
+      })
+      .catch(err => {
+        console.error("Error fetching patient details:", err);
+        setError(err.message || "Failed to connect to Central Telemetry Server");
+        setPatient(null);
+      });
+  };
+
   useEffect(() => {
-    fetch(`/api/patients/${patientId}`).then(r => r.json()).then(setPatient);
+    fetchPatientData();
     fetchAlerts();
   }, [patientId]);
 
@@ -87,7 +116,32 @@ export default function PatientDetailPage() {
     }
   };
 
-  if (!patient) return <div className="flex min-h-[50vh] items-center justify-center text-gray-400 font-mono">Loading patient profile...</div>;
+  if (error) return (
+    <div className="flex min-h-[70vh] items-center justify-center p-4">
+      <div className="text-center space-y-5 max-w-md p-8 bg-red-950/20 border border-red-900/40 rounded-3xl backdrop-blur-xl shadow-2xl animate-in zoom-in duration-300">
+        <div className="h-16 w-16 bg-red-500/10 text-red-500 rounded-2xl flex items-center justify-center mx-auto border border-red-500/20">
+          <AlertTriangle className="animate-pulse" size={32} />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-xl font-extrabold text-red-400 uppercase tracking-widest font-mono">Patient Link Failure</h2>
+          <p className="text-gray-400 text-xs font-mono bg-black/30 p-3 rounded-lg border border-red-950 break-all select-all">{error}</p>
+        </div>
+        <button 
+          onClick={() => {
+            setError(null);
+            setPatient(null);
+            fetchPatientData();
+            fetchAlerts();
+          }}
+          className="w-full py-3 bg-gradient-to-r from-red-600/20 to-red-800/20 hover:from-red-600/30 hover:to-red-800/30 text-red-200 border border-red-500/30 rounded-xl text-xs font-bold tracking-widest uppercase transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] cursor-pointer shadow-lg hover:shadow-red-950/50"
+        >
+          Re-establish Connection
+        </button>
+      </div>
+    </div>
+  );
+
+  if (!patient) return <div className="flex min-h-[50vh] items-center justify-center text-gray-400 font-mono animate-pulse">Loading patient profile...</div>;
 
   const hasActiveAlerts = alerts.some(alert => !alert.isResolved);
 
