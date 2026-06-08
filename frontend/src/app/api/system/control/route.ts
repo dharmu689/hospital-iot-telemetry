@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { exec, spawn } from "child_process";
 import path from "path";
 
-const ROOT = path.resolve(process.cwd(), "..");
+const ROOT = path.resolve(process.cwd(), "..", "..");
 
 export async function POST(req: NextRequest) {
   const { target, action } = await req.json();
@@ -11,9 +11,8 @@ export async function POST(req: NextRequest) {
     if (action === "start") {
       const folder = target === "simulator" ? "simulator" : "agent";
       const script = target === "simulator" ? "simulator.py" : "agent.py";
-      const fullPath = path.join(ROOT, folder);
+      const fullPath = path.resolve(process.cwd(), "..", folder);
       
-      // Start in background using spawn
       const child = spawn(path.join(fullPath, "venv", "Scripts", "python.exe"), [script], {
         cwd: fullPath,
         detached: true,
@@ -24,7 +23,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, message: `${target} started` });
     } else if (action === "stop") {
       const scriptName = target === "simulator" ? "simulator.py" : "agent.py";
-      const cmd = `powershell "Get-Process | Where-Object {$_.CommandLine -like '*${scriptName}*'} | Stop-Process -Force"`;
+      const cmd = `powershell "Get-WmiObject Win32_Process -Filter 'Name = ''python.exe'' AND CommandLine LIKE ''%${scriptName}%''' | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"`;
       
       exec(cmd);
       return NextResponse.json({ success: true, message: `${target} stopped` });

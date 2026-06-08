@@ -6,11 +6,9 @@ const execAsync = promisify(exec);
 
 export async function GET() {
   try {
-    // Check for Simulator
-    const { stdout: simOut } = await execAsync('powershell "Get-Process | Where-Object {$_.CommandLine -like \'*simulator.py*\'} | Select-Object -ExpandProperty Id"').catch(() => ({ stdout: "" }));
+    const { stdout: simOut } = await execAsync('powershell "Get-WmiObject Win32_Process -Filter \'Name = ''python.exe'' AND CommandLine LIKE ''%simulator.py%''' | Select-Object -ExpandProperty ProcessId"').catch(() => ({ stdout: "" }));
     
-    // Check for Agent
-    const { stdout: agentOut } = await execAsync('powershell "Get-Process | Where-Object {$_.CommandLine -like \'*agent.py*\'} | Select-Object -ExpandProperty Id"').catch(() => ({ stdout: "" }));
+    const { stdout: agentOut } = await execAsync('powershell "Get-WmiObject Win32_Process -Filter \'Name = ''python.exe'' AND CommandLine LIKE ''%agent.py%''' | Select-Object -ExpandProperty ProcessId"').catch(() => ({ stdout: "" }));
 
     return NextResponse.json({
       simulator: simOut.trim() !== "",

@@ -6,12 +6,12 @@ import VitalsChart from "@/components/VitalsChart";
 import { Patient, Alert } from "@/types";
 import { 
   Activity, 
-  Heart, 
-  Thermometer, 
-  Clock, 
-  CheckCircle, 
-  ChevronDown, 
-  ChevronUp, 
+  Heart,
+  Thermometer,
+  Clock,
+  CheckCircle,
+  ChevronDown,
+  ChevronUp,
   ShieldAlert,
   AlertTriangle
 } from "lucide-react";
@@ -126,7 +126,7 @@ export default function PatientDetailPage() {
           <h2 className="text-xl font-extrabold text-red-400 uppercase tracking-widest font-mono">Patient Link Failure</h2>
           <p className="text-gray-400 text-xs font-mono bg-black/30 p-3 rounded-lg border border-red-950 break-all select-all">{error}</p>
         </div>
-        <button 
+        <button
           onClick={() => {
             setError(null);
             setPatient(null);
@@ -158,7 +158,34 @@ export default function PatientDetailPage() {
         <div className="text-right">
           <div className="flex items-center space-x-2 text-green-400 font-mono text-sm">
             <Clock size={16} />
-            <span>Last sync: {latest ? new Date(latest.timestamp).toLocaleTimeString() : "--"}</span>
+            <span>Last sync: {latest ? new Date(latest.timestamp).toLocaleTimeString() : "--"}</span>        
+          </div>
+        </div>
+      </div>
+
+      {/* Patient Extended Details */}
+      <div className="bg-gray-900/50 p-6 rounded-2xl border border-gray-800">
+        <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">Extended Profile</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">Blood Group</p>
+            <p className="text-red-400 font-bold">{patient.bloodGroup || "N/A"}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">Allergies</p>
+            <p className="text-white">{patient.allergies || "None"}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">Contact Number</p>
+            <p className="text-white">{patient.contactNumber || "N/A"}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">Emergency Contact</p>
+            <p className="text-orange-400">{patient.emergencyContact || "N/A"}</p>
+          </div>
+          <div className="md:col-span-4 border-t border-gray-800/50 mt-2 pt-4">
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">Address</p>
+            <p className="text-white">{patient.address || "N/A"}</p>
           </div>
         </div>
       </div>
@@ -166,18 +193,18 @@ export default function PatientDetailPage() {
       {/* Current Vitals Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Heart Rate", val: latest?.heartRate, unit: "bpm", icon: Heart, color: "text-red-500" },
+          { label: "Heart Rate", val: latest?.heartRate, unit: "bpm", icon: Heart, color: "text-red-500" },  
           { label: "SpO2", val: latest?.spo2, unit: "%", icon: Activity, color: "text-blue-500" },
           { label: "Blood Pressure", val: latest ? `${latest.systolic}/${latest.diastolic}` : "--", unit: "mmHg", icon: Activity, color: "text-orange-500" },
           { label: "Temperature", val: latest?.temperature, unit: "°F", icon: Thermometer, color: "text-pink-500" },
         ].map((item, idx) => (
-          <div key={idx} className="bg-gray-880 p-6 rounded-2xl border border-gray-700 shadow-lg">
+          <div key={idx} className="bg-gray-800 p-6 rounded-2xl border border-gray-700 shadow-lg">
             <div className="flex justify-between items-start mb-4">
               <item.icon className={item.color} size={24} />
               <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{item.label}</span>
             </div>
             <div className="text-3xl font-mono font-bold">
-              {item.val ?? "--"} <span className="text-sm font-normal text-gray-500">{item.unit}</span>
+              {item.val ?? "--"} <span className="text-sm font-normal text-gray-500">{item.unit}</span>      
             </div>
           </div>
         ))}
@@ -193,13 +220,13 @@ export default function PatientDetailPage() {
 
       {/* Alerts Section */}
       <div className="space-y-4">
-        <div className="flex justify-between items-center border-b border-gray-850 pb-3">
+        <div className="flex justify-between items-center border-b border-gray-800 pb-3">
           <h2 className="text-xl font-bold flex items-center gap-2">
             <ShieldAlert className="text-red-400" /> Patient Alert History
           </h2>
           <div className="flex items-center gap-3">
             {hasActiveAlerts && (
-              <button 
+              <button
                 onClick={handleResolveAll}
                 disabled={resolvingAll}
                 className="text-xs font-semibold text-red-400 hover:text-red-300 flex items-center gap-1 transition-colors cursor-pointer bg-transparent border border-red-500/20 px-3 py-1.5 rounded-lg hover:bg-red-500/5"
@@ -207,7 +234,7 @@ export default function PatientDetailPage() {
                 Resolve All Active
               </button>
             )}
-            <button 
+            <button
               onClick={fetchAlerts}
               className="text-xs font-semibold text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors cursor-pointer bg-transparent border-0"
             >
@@ -217,30 +244,30 @@ export default function PatientDetailPage() {
         </div>
 
         {loadingAlerts && alerts.length === 0 ? (
-          <div className="py-10 text-center text-xs text-gray-500 font-mono">Loading history...</div>
+          <div className="py-10 text-center text-xs text-gray-500 font-mono">Loading history...</div>        
         ) : alerts.length === 0 ? (
-          <div className="text-center py-10 bg-gray-950/20 rounded-2xl border border-dashed border-gray-800">
-            <p className="text-gray-500 text-sm">No active or historical alerts logged for this patient.</p>
+          <div className="text-center py-10 bg-gray-900/20 rounded-2xl border border-dashed border-gray-800">
+            <p className="text-gray-500 text-sm">No active or historical alerts logged for this patient.</p> 
           </div>
         ) : (
           <div className="space-y-3">
             {alerts.map((alert) => {
               const isExpanded = expandedAlertId === alert.alertId;
               return (
-                <div 
+                <div
                   key={alert.alertId}
-                  className={`bg-gray-950/30 rounded-xl border transition-all duration-205 overflow-hidden ${
-                    isExpanded ? "border-gray-700 bg-gray-950/50 shadow-md" : "border-gray-850 hover:border-gray-800"
+                  className={`bg-gray-900/30 rounded-xl border transition-all duration-200 overflow-hidden ${
+                    isExpanded ? "border-gray-700 bg-gray-900/50 shadow-md" : "border-gray-800 hover:border-gray-700"
                   }`}
                 >
-                  <div 
+                  <div
                     onClick={() => toggleExpand(alert.alertId)}
                     className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 cursor-pointer"
                   >
                     <div className="flex items-start md:items-center gap-3">
-                      <div className={`px-2.5 py-1 rounded-lg font-mono font-bold text-[10px] uppercase ${
-                        alert.isResolved 
-                          ? "bg-gray-850 border border-gray-800 text-gray-500" 
+                      <div className={`px-2.5 py-1 rounded-lg font-mono font-bold text-[10px] uppercase ${   
+                        alert.isResolved
+                          ? "bg-gray-800 border border-gray-700 text-gray-500"
                           : alert.severity === "critical"
                             ? "bg-red-500/10 border border-red-500/20 text-red-400"
                             : "bg-amber-500/10 border border-amber-500/20 text-amber-400"
@@ -261,7 +288,7 @@ export default function PatientDetailPage() {
                           <CheckCircle size={10} /> Resolved
                         </span>
                       ) : (
-                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>       
                           <span className="text-[11px] text-red-400 font-medium flex items-center gap-1 bg-red-400/5 px-2 py-0.5 rounded border border-red-400/10 animate-pulse">
                             <Activity size={10} /> Active
                           </span>
@@ -281,9 +308,9 @@ export default function PatientDetailPage() {
                   </div>
 
                   {isExpanded && (
-                    <div className="px-4 pb-5 pt-1 border-t border-gray-900 bg-gray-950/20 space-y-4 text-xs">
+                    <div className="px-4 pb-5 pt-1 border-t border-gray-800 bg-gray-900/20 space-y-4 text-xs">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        
+
                         {/* Snapshot */}
                         <div>
                           <h4 className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-2">Vitals at Trigger</h4>
@@ -293,7 +320,7 @@ export default function PatientDetailPage() {
                                 { label: "HR", val: alert.vitalsAtTrigger.heartRate, unit: "bpm" },
                                 { label: "SpO2", val: alert.vitalsAtTrigger.spo2, unit: "%" },
                                 { label: "BP", val: `${alert.vitalsAtTrigger.systolic}/${alert.vitalsAtTrigger.diastolic}`, unit: "mmHg" },
-                                { label: "Temp", val: alert.vitalsAtTrigger.temperature, unit: "°F" }
+                                { label: "Temp", val: alert.vitalsAtTrigger.temperature, unit: "°F" }       
                               ].map((v, i) => (
                                 <div key={i} className="bg-gray-900 border border-gray-800 rounded-lg p-2 text-center">
                                   <span className="block text-[8px] font-bold text-gray-500 uppercase">{v.label}</span>
@@ -302,13 +329,13 @@ export default function PatientDetailPage() {
                                 </div>
                               ))
                             ) : (
-                              <div className="col-span-4 py-2 text-center text-gray-655">Unavailable</div>
+                              <div className="col-span-4 py-2 text-center text-gray-600">Unavailable</div>   
                             )}
                           </div>
 
                           {alert.isResolved && alert.resolvedAt && (
                             <div className="bg-green-500/5 border border-green-500/10 rounded-lg p-3 mt-3 flex items-start gap-2">
-                              <CheckCircle size={14} className="text-green-500 mt-0.5 flex-shrink-0" />
+                              <CheckCircle size={14} className="text-green-500 mt-0.5 flex-shrink-0" />      
                               <div>
                                 <span className="block font-bold text-green-400">Resolved Alert Details</span>
                                 <span className="block text-[10px] text-gray-500 font-mono mt-0.5">
@@ -322,7 +349,7 @@ export default function PatientDetailPage() {
                         {/* Recommendations */}
                         <div>
                           <h4 className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-2">Clinical Recommendations</h4>
-                          <div className="bg-gray-900 border border-gray-850 rounded-lg p-3 space-y-2">
+                          <div className="bg-gray-900 border border-gray-800 rounded-lg p-3 space-y-2">      
                             {alert.recommendations && alert.recommendations.length > 0 ? (
                               alert.recommendations.map((rec, i) => (
                                 <p key={i} className="text-gray-300 leading-normal flex gap-2">
@@ -340,7 +367,7 @@ export default function PatientDetailPage() {
 
                       {/* Explanation */}
                       {alert.aiExplanation && (
-                        <div className="border-t border-gray-900 pt-3">
+                        <div className="border-t border-gray-800 pt-3">
                           <h4 className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">AI Clinical Explanation</h4>
                           <div className="bg-gray-900/50 p-3 rounded-lg text-gray-400 leading-relaxed italic font-sans">
                             "{alert.aiExplanation}"
