@@ -1,4 +1,4 @@
-export interface VitalReading {
+﻿export interface VitalReading {
   heartRate: number;
   spo2: number;
   systolic: number;
@@ -18,6 +18,11 @@ export interface Patient {
   assignedDoctor: string;
   status: 'active' | 'discharged';
   isSimulated: boolean;
+  contactNumber?: string;
+  emergencyContact?: string;
+  address?: string;
+  bloodGroup?: string;
+  allergies?: string;
 }
 
 export interface Alert {
@@ -32,4 +37,3 @@ export interface Alert {
   recommendations?: string[];
   vitalsAtTrigger?: VitalReading;
 }
-
