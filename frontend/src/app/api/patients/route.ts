@@ -20,8 +20,9 @@ export async function POST(req: NextRequest) {
     const { patientId, ...data } = body;
     await adminDb.collection("patients").doc(patientId).set({
       ...data,
+      patientId: patientId, // Ensure patientId is in the document body
       status: 'active',
-      isSimulated: false,
+      isSimulated: true, // Set to true so the Python simulator picks them up
     });
     return NextResponse.json({ success: true });
   } catch (error: any) {
