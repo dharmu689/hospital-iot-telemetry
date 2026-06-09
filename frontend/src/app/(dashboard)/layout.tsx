@@ -4,9 +4,10 @@ import { auth } from "@/lib/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { LogOut, LayoutDashboard, Users, Bell, Activity, UserPlus } from "lucide-react";
+import { LogOut, LayoutDashboard, Users, Bell, Activity, UserPlus, Archive } from "lucide-react";
 import { AlertNotifier } from "@/components/AlertNotifier";
 import SystemControls from "@/components/SystemControls";
+import TopBar from "@/components/TopBar";
 import { Toaster } from "sonner";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -51,6 +52,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <Link href="/alerts" className="flex items-center space-x-3 rounded-xl p-3 hover:bg-gray-800 transition-all text-sm font-medium text-gray-400 hover:text-white">
             <Bell size={20} /> <span>Alert Center</span>
           </Link>
+          <Link href="/discharged" className="flex items-center space-x-3 rounded-xl p-3 hover:bg-gray-800 transition-all text-sm font-medium text-gray-400 hover:text-white">
+            <Archive size={20} /> <span>Discharged</span>
+          </Link>
 
           {/* System Control Section moved here */}
           <SystemControls />
@@ -69,6 +73,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Main Content Area */}
       <main className="flex-1 ml-64 p-10 bg-gray-900/50 min-h-screen">
         <div className="max-w-7xl mx-auto">
+            <TopBar />
             {children}
         </div>
       </main>

@@ -1,24 +1,54 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Patient } from "@/types";
-import { Search, Activity, User, ChevronRight } from "lucide-react";
+import { Search, Activity, User, ChevronRight, Edit, Archive } from "lucide-react";
 import Link from "next/link";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 export default function PatientsDirectoryPage() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const router = useRouter();
 
-  useEffect(() => {
+  const fetchPatients = () => {
+    setLoading(true);
     fetch("/api/patients")
       .then(res => res.json())
       .then(data => {
-        setPatients(data);
+        // Only show active patients
+        const active = Array.isArray(data) ? data.filter(p => p.status === 'active') : [];
+        setPatients(active);
         setLoading(false);
       });
+  };
+
+  useEffect(() => {
+    fetchPatients();
   }, []);
 
-  const filteredPatients = patients.filter(p => 
+  const handleDischarge = async (patientId: string, e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent navigating to profile
+    if (!confirm("Are you sure you want to discharge this patient? They will be moved to the archive.")) return;
+    try {
+      const res = await fetch(`/api/patients/${patientId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: 'discharged', isSimulated: false }) // Stop simulating when discharged
+      });
+      if (res.ok) {
+        toast.success("Patient discharged successfully.");
+        fetchPatients();
+      } else {
+        throw new Error("Failed to update status");
+      }
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+
+  const filteredPatients = patients.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.patientId.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.ward.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -44,8 +74,8 @@ export default function PatientsDirectoryPage() {
 
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-          <input 
-            type="text" 
+          <input
+            type="text"
             placeholder="Search by name, ID, ward, or doctor..."
             className="bg-gray-800 border border-gray-700 rounded-xl py-2.5 pl-10 pr-4 text-sm text-white focus:outline-none focus:border-blue-500 w-full md:w-80 transition-all"
             value={searchTerm}
@@ -69,7 +99,7 @@ export default function PatientsDirectoryPage() {
             <tbody className="divide-y divide-gray-700/50">
               {filteredPatients.map(patient => (
                 <tr key={patient.patientId} className="hover:bg-gray-750 transition-colors group">
-                  <td className="px-6 py-5">
+                  <td className="px-6 py-5 cursor-pointer" onClick={() => router.push(`/patients/${patient.patientId}`)}>
                     <div className="flex items-center gap-4">
                       <div className="h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500 border border-blue-500/20">
                         <User size={24} />
@@ -80,22 +110,31 @@ export default function PatientsDirectoryPage() {
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-5">
+                  <td className="px-6 py-5 cursor-pointer" onClick={() => router.push(`/patients/${patient.patientId}`)}>
                     <div className="font-bold text-white text-base">{patient.ward}</div>
-                    <div className="text-xs uppercase tracking-widest mt-1">Bed <span className="text-gray-300">{patient.bedNumber}</span></div>
+                    <div className="text-xs uppercase tracking-widest mt-1">Bed <span className="text-gray-300">{patient.bedNumber}</span></div>    
                   </td>
-                  <td className="px-6 py-5 font-bold text-gray-300 text-base">
+                  <td className="px-6 py-5 font-bold text-gray-300 text-base cursor-pointer" onClick={() => router.push(`/patients/${patient.patientId}`)}>
                     {patient.assignedDoctor}
                   </td>
-                  <td className="px-6 py-5">
+                  <td className="px-6 py-5 cursor-pointer" onClick={() => router.push(`/patients/${patient.patientId}`)}>
                     <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest bg-green-500/10 text-green-500 border border-green-500/20">
                       Admitted
                     </span>
                   </td>
                   <td className="px-6 py-5 text-right">
-                    <Link href={`/patients/${patient.patientId}`} className="inline-flex items-center gap-1 px-4 py-2 rounded-xl bg-gray-900 text-blue-400 hover:text-white hover:bg-blue-600 font-bold text-xs uppercase tracking-widest transition-all border border-gray-700 hover:border-transparent shadow-sm">
-                      View Profile <ChevronRight size={16} />
-                    </Link>
+                    <div className="flex justify-end gap-2">
+                        {/* We use a simple link to profile for editing or we can add an Edit page, but for now we have profile */}
+                        <Link href={`/patients/${patient.patientId}`} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-gray-900 text-blue-400 hover:text-white hover:bg-blue-600 font-bold text-[10px] uppercase tracking-widest transition-all border border-gray-700 hover:border-transparent shadow-sm">
+                            <Edit size={14} /> Profile
+                        </Link>
+                        <button 
+                            onClick={(e) => handleDischarge(patient.patientId, e)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-900/30 text-red-400 hover:bg-red-600 hover:text-white font-bold text-[10px] uppercase tracking-widest transition-all border border-red-500/20 shadow-sm"
+                        >
+                            <Archive size={14} /> Discharge
+                        </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -103,7 +142,7 @@ export default function PatientsDirectoryPage() {
           </table>
           {filteredPatients.length === 0 && (
             <div className="text-center py-16 bg-gray-900/20">
-              <p className="text-gray-500 font-medium text-lg">No patients found in the directory.</p>
+              <p className="text-gray-500 font-medium text-lg">No active patients found.</p>
             </div>
           )}
         </div>
