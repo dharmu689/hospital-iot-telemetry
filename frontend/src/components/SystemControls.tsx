@@ -7,7 +7,7 @@ import { Patient } from "@/types";
 export default function SystemControls() {
   const [systemStatus, setSystemStatus] = useState({ simulator: false, agent: false });
   const [patients, setPatients] = useState<Patient[]>([]);
-  const [selectedPatientId, setSelectedPatientId] = useState<string>("");
+  const [selectedPatientIds, setSelectedPatientIds] = useState<string[]>([]);
   const [triggering, setTriggering] = useState(false);
 
   const fetchStatus = async () => {
@@ -24,9 +24,6 @@ export default function SystemControls() {
       const data = await res.json();
       if (Array.isArray(data)) {
         setPatients(data);
-        if (data.length > 0 && !selectedPatientId) {
-          setSelectedPatientId(data[0].patientId);
-        }
       }
     } catch(e) {}
   };
@@ -53,22 +50,31 @@ export default function SystemControls() {
     }
   };
 
+  const handleTogglePatient = (id: string) => {
+      setSelectedPatientIds(prev => 
+          prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
+      );
+  };
+  
+  const selectAll = () => setSelectedPatientIds(patients.map(p => p.patientId));
+  const deselectAll = () => setSelectedPatientIds([]);
+
   const handleForceEmergency = async () => {
-    if (!selectedPatientId) return;
-    const patient = patients.find(p => p.patientId === selectedPatientId);
-    if (!confirm(`Are you sure you want to force an emergency for ${patient?.name || selectedPatientId}?`)) return;
+    if (selectedPatientIds.length === 0) return;
+    if (!confirm(`Are you sure you want to force an emergency for ${selectedPatientIds.length} patient(s)?`)) return;
 
     setTriggering(true);
     try {
       const res = await fetch("/api/patients/trigger-emergency", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ patientId: selectedPatientId, vitalType: "random", severity: "critical" })
+        body: JSON.stringify({ patientId: selectedPatientIds, vitalType: "random", severity: "critical" })
       });
       const data = await res.json();
 
       if (data.success) {
-        toast.success(`Emergency sequence initiated for ${patient?.name || selectedPatientId}`);
+        toast.success(data.message);
+        setSelectedPatientIds([]); // clear selection after triggering
       } else {
         toast.error("Failed to trigger emergency: " + data.error);
       }
@@ -132,25 +138,36 @@ export default function SystemControls() {
 
       {/* Force Emergency Control */}
       <div className="space-y-2 border-t border-gray-800 pt-4">
-        <div className="flex items-center px-2 mb-2">
+        <div className="flex items-center justify-between px-2 mb-2">
           <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">Trigger Emergency</span>
+          <div className="flex gap-2">
+              <button onClick={selectAll} className="text-[8px] text-blue-400 hover:text-blue-300 uppercase font-bold transition-colors cursor-pointer bg-transparent border-0">All</button>
+              <button onClick={deselectAll} className="text-[8px] text-gray-500 hover:text-gray-300 uppercase font-bold transition-colors cursor-pointer bg-transparent border-0">None</button>
+          </div>
         </div>
-        <select 
-          value={selectedPatientId}
-          onChange={(e) => setSelectedPatientId(e.target.value)}
-          className="w-full bg-gray-900 border border-gray-700 rounded-lg px-2 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-red-500 transition-colors"
-        >
+        
+        <div className="max-h-36 overflow-y-auto bg-gray-900 border border-gray-700 rounded-lg p-1.5 space-y-0.5 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
           {patients.map(p => (
-            <option key={p.patientId} value={p.patientId}>{p.name} ({p.patientId})</option>
+            <label key={p.patientId} className="flex items-center gap-2.5 px-2 py-1.5 hover:bg-gray-800 rounded-md cursor-pointer transition-colors">
+              <input 
+                type="checkbox" 
+                checked={selectedPatientIds.includes(p.patientId)}
+                onChange={() => handleTogglePatient(p.patientId)}
+                className="rounded border-gray-600 bg-gray-800 text-red-500 focus:ring-red-500 focus:ring-offset-gray-900 w-3 h-3 cursor-pointer"
+              />
+              <span className="text-xs text-gray-300 truncate font-medium">{p.name} <span className="text-[10px] text-gray-500">({p.patientId})</span></span>
+            </label>
           ))}
-        </select>
+          {patients.length === 0 && <div className="text-xs text-gray-500 p-2 text-center">No patients</div>}
+        </div>
+
         <button 
           onClick={handleForceEmergency}
-          disabled={triggering || !selectedPatientId}
-          className="w-full flex justify-center items-center gap-2 bg-red-900/40 hover:bg-red-600/40 border border-red-500/30 text-red-400 px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all disabled:opacity-50"
+          disabled={triggering || selectedPatientIds.length === 0}
+          className="w-full flex justify-center items-center gap-2 bg-red-900/40 hover:bg-red-600/40 border border-red-500/30 text-red-400 px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-2"
         >
           <AlertTriangle size={12} />
-          {triggering ? "Triggering..." : "Force Alert"}
+          {triggering ? "Triggering..." : `Force Alert (${selectedPatientIds.length})`}
         </button>
       </div>
 
