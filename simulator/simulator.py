@@ -80,6 +80,8 @@ def generate_vitals(patient_id, thresholds):
     
     # Normal Random walk with baseline reversion (tendency to return to normal)
     for k in v:
+        if k == 'timestamp':
+            continue
         if k == 'temperature':
             v[k] += random.uniform(-0.1, 0.1)
             # Revert to mean by 5% each tick
