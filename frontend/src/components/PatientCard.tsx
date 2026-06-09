@@ -1,40 +1,12 @@
 "use client";
-import { useState } from "react";
 import { useLiveVitals } from "@/hooks/useLiveVitals";
 import { Patient } from "@/types";
-import { Activity, Heart, Thermometer, Droplets, AlertTriangle } from "lucide-react";
+import { Activity, Heart, Thermometer, Droplets } from "lucide-react";
 import Link from "next/link";
 import { LineChart, Line, ResponsiveContainer, YAxis } from "recharts";
-import { toast } from "sonner";
 
 export default function PatientCard({ patient }: { patient: Patient }) {
   const { latest, stream } = useLiveVitals(patient.patientId);
-  const [triggering, setTriggering] = useState(false);
-
-  const handleForceEmergency = async (e: React.MouseEvent) => {
-    e.preventDefault(); // Prevent navigating to the patient page
-    if (!confirm(`Are you sure you want to force an emergency for ${patient.name}?`)) return;
-    
-    setTriggering(true);
-    try {
-      const res = await fetch("/api/patients/trigger-emergency", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ patientId: patient.patientId, vitalType: "random", severity: "critical" })
-      });
-      const data = await res.json();
-      
-      if (data.success) {
-        toast.success(`Emergency sequence initiated for ${patient.name}`);
-      } else {
-        toast.error("Failed to trigger emergency: " + data.error);
-      }
-    } catch (err) {
-      toast.error("An error occurred while triggering the emergency.");
-    } finally {
-      setTriggering(false);
-    }
-  };
 
   return (
     <Link href={`/patients/${patient.patientId}`}>
@@ -50,16 +22,6 @@ export default function PatientCard({ patient }: { patient: Patient }) {
               <div className={`h-2 w-2 rounded-full ${latest ? 'bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.5)]' : 'bg-gray-600'}`} />
               <span className="text-[10px] font-bold text-gray-400">LIVE</span>
             </div>
-            
-            {/* FORCE EMERGENCY BUTTON */}
-            <button 
-              onClick={handleForceEmergency}
-              disabled={triggering}
-              className="flex items-center gap-1 bg-red-900/40 hover:bg-red-600/40 border border-red-500/30 text-red-400 px-2 py-1 rounded-lg text-[9px] font-bold uppercase tracking-widest transition-all z-10 disabled:opacity-50"
-            >
-              <AlertTriangle size={10} />
-              {triggering ? "Forcing..." : "Force Alert"}
-            </button>
           </div>
         </div>
 

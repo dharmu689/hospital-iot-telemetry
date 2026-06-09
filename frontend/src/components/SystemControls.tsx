@@ -1,10 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Play, Square, Settings, Activity, Brain } from "lucide-react";
+import { Play, Square, Settings, Activity, Brain, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { Patient } from "@/types";
 
 export default function SystemControls() {
   const [systemStatus, setSystemStatus] = useState({ simulator: false, agent: false });
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [selectedPatientId, setSelectedPatientId] = useState<string>("");
+  const [triggering, setTriggering] = useState(false);
 
   const fetchStatus = async () => {
     try {
@@ -14,8 +18,22 @@ export default function SystemControls() {
     } catch (e) {}
   };
 
+  const fetchPatients = async () => {
+    try {
+      const res = await fetch("/api/patients");
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setPatients(data);
+        if (data.length > 0 && !selectedPatientId) {
+          setSelectedPatientId(data[0].patientId);
+        }
+      }
+    } catch(e) {}
+  };
+
   useEffect(() => {
     fetchStatus();
+    fetchPatients();
     const interval = setInterval(fetchStatus, 5000);
     return () => clearInterval(interval);
   }, []);
@@ -32,6 +50,32 @@ export default function SystemControls() {
       fetchStatus();
     } else {
       toast.error("Control error: " + data.error);
+    }
+  };
+
+  const handleForceEmergency = async () => {
+    if (!selectedPatientId) return;
+    const patient = patients.find(p => p.patientId === selectedPatientId);
+    if (!confirm(`Are you sure you want to force an emergency for ${patient?.name || selectedPatientId}?`)) return;
+
+    setTriggering(true);
+    try {
+      const res = await fetch("/api/patients/trigger-emergency", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ patientId: selectedPatientId, vitalType: "random", severity: "critical" })
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        toast.success(`Emergency sequence initiated for ${patient?.name || selectedPatientId}`);
+      } else {
+        toast.error("Failed to trigger emergency: " + data.error);
+      }
+    } catch (err) {
+      toast.error("An error occurred while triggering the emergency.");
+    } finally {
+      setTriggering(false);
     }
   };
 
@@ -86,9 +130,33 @@ export default function SystemControls() {
         </div>
       </div>
 
+      {/* Force Emergency Control */}
+      <div className="space-y-2 border-t border-gray-800 pt-4">
+        <div className="flex items-center px-2 mb-2">
+          <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">Trigger Emergency</span>
+        </div>
+        <select 
+          value={selectedPatientId}
+          onChange={(e) => setSelectedPatientId(e.target.value)}
+          className="w-full bg-gray-900 border border-gray-700 rounded-lg px-2 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-red-500 transition-colors"
+        >
+          {patients.map(p => (
+            <option key={p.patientId} value={p.patientId}>{p.name} ({p.patientId})</option>
+          ))}
+        </select>
+        <button 
+          onClick={handleForceEmergency}
+          disabled={triggering || !selectedPatientId}
+          className="w-full flex justify-center items-center gap-2 bg-red-900/40 hover:bg-red-600/40 border border-red-500/30 text-red-400 px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all disabled:opacity-50"
+        >
+          <AlertTriangle size={12} />
+          {triggering ? "Triggering..." : "Force Alert"}
+        </button>
+      </div>
+
       {/* Live Indicator Footer */}
       {(systemStatus.simulator || systemStatus.agent) && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-gray-900/50 rounded-lg border border-gray-800">
+        <div className="flex items-center gap-2 px-3 py-2 bg-gray-900/50 rounded-lg border border-gray-800 mt-4">
             <Activity size={12} className="text-green-500 animate-pulse" />
             <span className="text-[9px] text-gray-500 font-bold uppercase tracking-tighter">Processing Live Telemetry</span>
         </div>
