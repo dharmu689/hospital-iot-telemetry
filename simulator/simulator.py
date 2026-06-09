@@ -42,21 +42,47 @@ BASELINES = {
     'respiratoryRate': 16
 }
 
-def generate_vitals(patient_id, thresholds):
+def generate_vitals(patient_id, patient_data, thresholds, fs):
     global last_vitals, patient_states
-    
+
     if patient_id not in patient_states:
         patient_states[patient_id] = {'is_abnormal': False, 'abnormal_vital': None, 'trend_direction': 1, 'ticks_in_abnormal': 0}
 
-    # State transitions
     state = patient_states[patient_id]
-    if not state['is_abnormal']:
-        # 1% chance to become abnormal per tick (much less frequent)
+
+    # Check for manual emergency override from Dashboard
+    if patient_data.get('force_emergency') is True:
+        state['is_abnormal'] = True
+        
+        # Determine which vital to crash
+        req_vital = patient_data.get('emergency_vital', 'random')
+        if req_vital == 'random':
+            state['abnormal_vital'] = random.choice(['heartRate', 'spo2', 'systolic', 'respiratoryRate', 'temperature'])
+        else:
+            state['abnormal_vital'] = req_vital
+            
+        # Determine direction based on severity and vital type
+        # For SpO2, emergencies are always drops. For others, it can be spikes or drops.
+        if state['abnormal_vital'] == 'spo2':
+            state['trend_direction'] = -1
+        else:
+            state['trend_direction'] = 1 if random.random() > 0.5 else -1
+
+        state['ticks_in_abnormal'] = 0
+        
+        print(f"🚨 FORCED EMERGENCY TRIGGERED for {patient_id} ({state['abnormal_vital']})")
+        
+        # Reset the flag in Firestore so it doesn't trigger on every loop infinitely
+        fs.collection('patients').document(patient_id).update({'force_emergency': False})
+
+    # Natural State transitions
+    elif not state['is_abnormal']:
+        # 1% chance to become abnormal per tick naturally
         if random.random() < 0.01:
             state['is_abnormal'] = True
             state['abnormal_vital'] = random.choice(['heartRate', 'spo2', 'systolic', 'respiratoryRate', 'temperature'])
             state['trend_direction'] = 1 if random.random() > 0.5 else -1
-            if state['abnormal_vital'] == 'spo2': 
+            if state['abnormal_vital'] == 'spo2':
                 state['trend_direction'] = -1 # SpO2 usually drops
             state['ticks_in_abnormal'] = 0
     else:
@@ -77,7 +103,7 @@ def generate_vitals(patient_id, thresholds):
         return last_vitals[patient_id].copy()
 
     v = last_vitals[patient_id].copy()
-    
+
     # Normal Random walk with baseline reversion (tendency to return to normal)
     for k in v:
         if k == 'timestamp':
@@ -96,11 +122,16 @@ def generate_vitals(patient_id, thresholds):
     # Apply abnormal trends if currently in emergency
     if state['is_abnormal']:
         target = state['abnormal_vital']
+        
+        # If it was a forced emergency, we want to spike the vitals much faster
+        # so it hits the warning/critical threshold immediately for demo purposes
+        multiplier = 4 if patient_data.get('force_emergency') is True else 1
+        
         if target == 'temperature':
-            v[target] += random.uniform(0.1, 0.3) * state['trend_direction']
+            v[target] += random.uniform(0.2, 0.6) * state['trend_direction'] * multiplier
             v[target] = round(v[target], 1)
         else:
-            v[target] += random.randint(1, 4) * state['trend_direction']
+            v[target] += random.randint(2, 6) * state['trend_direction'] * multiplier
 
     # ABSOLUTE Hard limits (impossible to go below/above human survival bounds)
     v['heartRate'] = max(30, min(v['heartRate'], 220))
@@ -114,14 +145,17 @@ def generate_vitals(patient_id, thresholds):
     return v
 
 def main():
-    print('Starting Simulator with Realistic Telemetry Bounds...')
+    print('Starting Simulator with Realistic Telemetry Bounds & Emergency Override...')
     rtdb, fs = init_firebase()
     if not rtdb: return
+    thresholds = load_thresholds()
+    
     while True:
         try:
-            patients = fs.collection('patients').where('isSimulated', '==', True).stream()
-            for p in patients:
-                vitals = generate_vitals(p.id, {})
+            patients_ref = fs.collection('patients').where('isSimulated', '==', True).stream()
+            for p in patients_ref:
+                patient_data = p.to_dict()
+                vitals = generate_vitals(p.id, patient_data, thresholds, fs)
                 ts = int(time.time() * 1000)
                 vitals['timestamp'] = ts
                 rtdb.reference(f'vitals/{p.id}/latest').set(vitals)

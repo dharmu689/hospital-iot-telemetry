@@ -1,4 +1,4 @@
-from openai import OpenAI
+﻿from openai import OpenAI
 import os
 import json
 
@@ -32,7 +32,7 @@ Respond in this exact JSON format:
 
     try:
         response = client.chat.completions.create(
-            model="gpt-4-turbo-preview",
+            model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3,
             response_format={"type": "json_object"}
@@ -44,3 +44,4 @@ Respond in this exact JSON format:
             "explanation": "AI analysis unavailable.",
             "recommendations": ["Check patient immediately"]
         }
+
