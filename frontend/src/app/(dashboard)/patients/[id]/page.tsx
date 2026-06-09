@@ -177,10 +177,6 @@ export default function PatientDetailPage() {
                 <Trash2 size={14} /> Delete
             </button>
           </div>
-          <div className="flex items-center space-x-2 text-green-400 font-mono text-sm">
-            <Clock size={16} />
-            <span>Last sync: {latest ? new Date(latest.timestamp).toLocaleTimeString() : "--"}</span>        
-          </div>
         </div>
       </div>
 
