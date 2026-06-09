@@ -3,8 +3,10 @@ import { adminDb } from "@/lib/firebase-admin";
 
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const patientId = searchParams.get("patientId");
+    const url = new URL(req.url);
+    const patientId = url.searchParams.get("patientId");
+    const page = parseInt(url.searchParams.get('page') || '1');
+    const limitCount = parseInt(url.searchParams.get('limit') || '10');
 
     // Fetch all patients to map names to alerts
     const patientsSnap = await adminDb.collection("patients").get();
@@ -24,7 +26,7 @@ export async function GET(req: NextRequest) {
       snapshot = await adminDb.collectionGroup("alerts").get();
     }
 
-    const alerts = snapshot.docs.map(doc => {
+    let alerts = snapshot.docs.map(doc => {
       const data = doc.data();
       const pId = data.patientId || "unknown";
       return {
@@ -33,10 +35,23 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    // Sort in-memory to avoid Firestore index requirements for collectionGroup orderBy
+    // Sort in-memory because Firestore collectionGroup queries need specific compound indexes for sorting
     alerts.sort((a: any, b: any) => b.triggeredAt - a.triggeredAt);
 
-    return NextResponse.json(alerts);
+    // Apply pagination in-memory because we had to sort in-memory
+    const total = alerts.length;
+    const startIndex = (page - 1) * limitCount;
+    const paginatedAlerts = alerts.slice(startIndex, startIndex + limitCount);
+
+    return NextResponse.json({
+      data: paginatedAlerts,
+      meta: {
+        total,
+        page,
+        limit: limitCount,
+        totalPages: Math.ceil(total / limitCount)
+      }
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

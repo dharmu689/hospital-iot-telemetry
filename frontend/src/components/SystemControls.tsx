@@ -20,11 +20,10 @@ export default function SystemControls() {
 
   const fetchPatients = async () => {
     try {
-      const res = await fetch("/api/patients");
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        setPatients(data);
-      }
+      const res = await fetch("/api/patients?limit=50&status=active");
+      const result = await res.json();
+      const data = result.data ? result.data : (Array.isArray(result) ? result : []);
+      setPatients(data);
     } catch(e) {}
   };
 
@@ -74,7 +73,7 @@ export default function SystemControls() {
 
       if (data.success) {
         toast.success(data.message);
-        setSelectedPatientIds([]); // clear selection after triggering
+        setSelectedPatientIds([]); 
       } else {
         toast.error("Failed to trigger emergency: " + data.error);
       }
