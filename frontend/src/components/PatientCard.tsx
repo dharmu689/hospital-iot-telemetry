@@ -1,11 +1,12 @@
 "use client";
+import { memo } from "react";
 import { useLiveVitals } from "@/hooks/useLiveVitals";
 import { Patient } from "@/types";
-import { Activity, Heart, Thermometer, Droplets } from "lucide-react";
+import { Heart, Thermometer, Droplets, Activity } from "lucide-react";
 import Link from "next/link";
 import { LineChart, Line, ResponsiveContainer, YAxis } from "recharts";
 
-export default function PatientCard({ patient }: { patient: Patient }) {
+function PatientCardInner({ patient }: { patient: Patient }) {
   const { latest, stream } = useLiveVitals(patient.patientId);
 
   return (
@@ -18,8 +19,8 @@ export default function PatientCard({ patient }: { patient: Patient }) {
             <p className="text-xs text-gray-400 uppercase tracking-widest font-semibold">{patient.ward} • Bed {patient.bedNumber}</p>
           </div>
           <div className="flex flex-col items-end gap-2">
-            <div className={`flex items-center gap-2 px-2 py-1 rounded-full bg-gray-900/50 border border-gray-700`}>
-              <div className={`h-2 w-2 rounded-full ${latest ? 'bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.5)]' : 'bg-gray-600'}`} />
+            <div className="flex items-center gap-2 px-2 py-1 rounded-full bg-gray-900/50 border border-gray-700">
+              <div className={`h-2 w-2 rounded-full ${latest ? "bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.5)]" : "bg-gray-600"}`} />
               <span className="text-[10px] font-bold text-gray-400">LIVE</span>
             </div>
           </div>
@@ -29,7 +30,7 @@ export default function PatientCard({ patient }: { patient: Patient }) {
         <div className="h-16 w-full mb-6 bg-gray-900/30 rounded-lg p-1">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={stream}>
-              <YAxis domain={['dataMin - 5', 'dataMax + 5']} hide />
+              <YAxis domain={["dataMin - 5", "dataMax + 5"]} hide />
               <Line
                 type="monotone"
                 dataKey="heartRate"
@@ -80,10 +81,20 @@ export default function PatientCard({ patient }: { patient: Patient }) {
 
         {/* Doctor Info */}
         <div className="mt-4 pt-4 border-t border-gray-700/50 flex justify-between items-center">
-            <span className="text-[10px] text-gray-500 font-bold uppercase">Attending</span>
-            <span className="text-[10px] text-gray-400 font-semibold">{patient.assignedDoctor}</span>
+          <span className="text-[10px] text-gray-500 font-bold uppercase">Attending</span>
+          <span className="text-[10px] text-gray-400 font-semibold">{patient.assignedDoctor}</span>
         </div>
       </div>
     </Link>
   );
 }
+
+const PatientCard = memo(PatientCardInner, (prev, next) =>
+  prev.patient.patientId === next.patient.patientId &&
+  prev.patient.name === next.patient.name &&
+  prev.patient.ward === next.patient.ward &&
+  prev.patient.bedNumber === next.patient.bedNumber &&
+  prev.patient.assignedDoctor === next.patient.assignedDoctor
+);
+
+export default PatientCard;

@@ -1,4 +1,5 @@
 "use client";
+import { memo, useMemo } from "react";
 import { VitalReading } from "@/types";
 import { format } from "date-fns";
 import {
@@ -13,46 +14,40 @@ import {
 } from "recharts";
 
 const VITAL_CONFIGS = [
-  { 
+  {
     id: "hr",
-    title: "Heart Rate", 
+    title: "Heart Rate",
     domain: [40, 160],
-    lines: [
-      { key: "heartRate", label: "Heart Rate", color: "#ef4444" }
-    ]
+    lines: [{ key: "heartRate", label: "Heart Rate", color: "#ef4444" }]
   },
-  { 
+  {
     id: "spo2",
-    title: "SpO2", 
+    title: "SpO2",
     domain: [80, 100],
-    lines: [
-      { key: "spo2", label: "SpO2", color: "#3b82f6" }
-    ]
+    lines: [{ key: "spo2", label: "SpO2", color: "#3b82f6" }]
   },
-  { 
+  {
     id: "bp",
-    title: "Blood Pressure", 
+    title: "Blood Pressure",
     domain: [40, 200],
     lines: [
       { key: "systolic", label: "Systolic", color: "#f59e0b" },
       { key: "diastolic", label: "Diastolic", color: "#10b981" }
     ]
   },
-  { 
+  {
     id: "temp",
-    title: "Temp (°F)", 
+    title: "Temp (°F)",
     domain: [94, 106],
-    lines: [
-      { key: "temperature", label: "Temperature", color: "#ec4899" }
-    ]
+    lines: [{ key: "temperature", label: "Temperature", color: "#ec4899" }]
   },
 ];
 
-export default function VitalsChart({ data }: { data: VitalReading[] }) {
-  const formattedData = data.map((d) => ({
-    ...d,
-    time: format(new Date(d.timestamp), "HH:mm:ss"),
-  }));
+function VitalsChartInner({ data }: { data: VitalReading[] }) {
+  const formattedData = useMemo(
+    () => data.map((d) => ({ ...d, time: format(new Date(d.timestamp), "HH:mm:ss") })),
+    [data]
+  );
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -81,7 +76,7 @@ export default function VitalsChart({ data }: { data: VitalReading[] }) {
                   contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: "8px", fontSize: "12px" }}
                   itemStyle={{ color: "#fff" }}
                 />
-                <Legend 
+                <Legend
                   wrapperStyle={{ fontSize: "10px", color: "#9ca3af" }}
                   iconType="circle"
                   iconSize={6}
@@ -106,3 +101,6 @@ export default function VitalsChart({ data }: { data: VitalReading[] }) {
     </div>
   );
 }
+
+const VitalsChart = memo(VitalsChartInner);
+export default VitalsChart;

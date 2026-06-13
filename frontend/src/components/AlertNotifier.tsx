@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { ref, onValue } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
 import { toast } from "sonner";
@@ -7,40 +7,50 @@ import { toast } from "sonner";
 export function AlertNotifier() {
   const knownAlerts = useRef<Set<string>>(new Set());
 
-  const handleResolveFromToast = async (alertId: string, patientId: string) => {
+  const handleResolveFromToast = useCallback(async (alertId: string, patientId: string) => {
     toast.dismiss(alertId);
     const loadingToastId = toast.loading("Resolving alert...");
     try {
       const res = await fetch("/api/alerts/resolve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ alertId, patientId })
+        body: JSON.stringify({ alertId, patientId }),
       });
       if (res.ok) {
         toast.success("Alert resolved successfully!", { id: loadingToastId });
       } else {
         toast.error("Failed to resolve alert", { id: loadingToastId });
       }
-    } catch (err) {
+    } catch {
       toast.error("Error resolving alert", { id: loadingToastId });
     }
-  };
+  }, []);
 
   useEffect(() => {
     const alertsRef = ref(rtdb, "alerts");
     const unsub = onValue(alertsRef, (snap) => {
-      if (!snap.exists()) return;
+      if (!snap.exists()) {
+        knownAlerts.current.clear();
+        return;
+      }
       const raw = snap.val();
+
+      // Prune resolved keys to prevent unbounded Set growth
+      knownAlerts.current.forEach((key) => {
+        const patientId = key.split("_")[0];
+        if (!raw[patientId]?.active) {
+          knownAlerts.current.delete(key);
+        }
+      });
+
       for (const patientId of Object.keys(raw)) {
         const active = raw[patientId]?.active;
         if (!active) continue;
         const key = `${patientId}_${active.alertId}`;
         if (!knownAlerts.current.has(key)) {
           knownAlerts.current.add(key);
-          
-          const alertMessage = active.message;
-          const alertId = active.alertId;
-          const severity = active.severity;
+
+          const { message: alertMessage, alertId, severity } = active;
 
           const toastContent = (
             <div className="flex flex-col gap-2 w-full text-left">
@@ -65,21 +75,15 @@ export function AlertNotifier() {
           );
 
           if (severity === "critical") {
-            toast.error(toastContent, { 
-              duration: 15000, 
-              id: alertId,
-            });
+            toast.error(toastContent, { duration: 15000, id: alertId });
           } else {
-            toast.warning(toastContent, { 
-              duration: 10000, 
-              id: alertId,
-            });
+            toast.warning(toastContent, { duration: 10000, id: alertId });
           }
         }
       }
     });
     return () => unsub();
-  }, []);
+  }, [handleResolveFromToast]);
 
   return null;
 }

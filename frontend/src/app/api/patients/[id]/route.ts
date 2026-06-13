@@ -6,7 +6,10 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
     const params = await props.params;
     const doc = await adminDb.collection("patients").doc(params.id).get();
     if (!doc.exists) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    return NextResponse.json({ patientId: doc.id, ...doc.data() });
+    return NextResponse.json(
+      { patientId: doc.id, ...doc.data() },
+      { headers: { "Cache-Control": "private, no-store" } }
+    );
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

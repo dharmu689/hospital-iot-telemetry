@@ -10,10 +10,13 @@ export async function GET() {
     
     const { stdout: agentOut } = await execAsync(`powershell "Get-WmiObject Win32_Process -Filter 'Name = ''python.exe'' AND CommandLine LIKE ''%agent.py%''' | Select-Object -ExpandProperty ProcessId"`).catch(() => ({ stdout: "" }));
 
-    return NextResponse.json({
-      simulator: simOut.trim() !== "",
-      agent: agentOut.trim() !== "",
-    });
+    return NextResponse.json(
+      {
+        simulator: simOut.trim() !== "",
+        agent: agentOut.trim() !== "",
+      },
+      { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
+    );
   } catch (error) {
     return NextResponse.json({ simulator: false, agent: false });
   }

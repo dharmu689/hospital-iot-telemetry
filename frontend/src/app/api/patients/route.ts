@@ -48,15 +48,18 @@ export async function GET(req: NextRequest) {
       patients = snapshot.docs.map(doc => ({ patientId: doc.id, ...doc.data() }));
     }
 
-    return NextResponse.json({
-      data: patients,
-      meta: {
-        total,
-        page,
-        limit: limitCount,
-        totalPages: Math.ceil(total / limitCount)
-      }
-    });
+    return NextResponse.json(
+      {
+        data: patients,
+        meta: {
+          total,
+          page,
+          limit: limitCount,
+          totalPages: Math.ceil(total / limitCount),
+        },
+      },
+      { headers: { "Cache-Control": "private, no-store" } }
+    );
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
