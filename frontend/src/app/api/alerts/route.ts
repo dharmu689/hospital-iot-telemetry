@@ -13,39 +13,42 @@ export async function GET(req: NextRequest) {
     let total = 0;
     let indexError = false;
 
-    // 1. Try DB-level sorting and pagination
-    try {
-      let query: any = adminDb.collectionGroup("alerts");
-      if (patientId) {
-        query = adminDb.collection("patients").doc(patientId).collection("alerts");
-      }
-
-      const countSnap = await query.count().get();
-      total = countSnap.data().count;
-
-      const offsetCount = (page - 1) * limitCount;
-      const snapshot = await query
+    // 1. Fetch alerts - query by patient if specified, otherwise fetch all patients' alerts
+    if (patientId) {
+      // Single patient: use direct collection query
+      const snapshot = await adminDb
+        .collection("patients")
+        .doc(patientId)
+        .collection("alerts")
         .orderBy("triggeredAt", "desc")
-        .offset(offsetCount)
-        .limit(limitCount)
         .get();
 
-      alerts = snapshot.docs.map((doc: any) => doc.data());
-    } catch (err: any) {
-      console.warn("Falling back to in-memory sorting/pagination:", err.message);
-      indexError = true;
-    }
-
-    // 2. Fallback to in-memory if DB-level query fails
-    if (indexError) {
-      let snapshot;
-      if (patientId) {
-        snapshot = await adminDb.collection("patients").doc(patientId).collection("alerts").get();
-      } else {
-        snapshot = await adminDb.collectionGroup("alerts").get();
-      }
       const allAlerts = snapshot.docs.map((doc: any) => doc.data());
+      total = allAlerts.length;
+      const startIndex = (page - 1) * limitCount;
+      alerts = allAlerts.slice(startIndex, startIndex + limitCount);
+    } else {
+      // All patients: fetch from each patient's alerts subcollection (capped to avoid slowness)
+      const patientsSnapshot = await adminDb.collection("patients").limit(100).get();
+      let allAlerts: any[] = [];
+
+      // Fetch alerts from each patient in parallel for speed
+      const alertPromises = patientsSnapshot.docs.map(patientDoc =>
+        adminDb
+          .collection("patients")
+          .doc(patientDoc.id)
+          .collection("alerts")
+          .limit(50) // Limit per patient to avoid huge fetches
+          .get()
+          .then(snap => snap.docs.map(doc => doc.data()))
+      );
+
+      const alertsPerPatient = await Promise.all(alertPromises);
+      allAlerts = alertsPerPatient.flat();
+
+      // Sort by triggeredAt descending
       allAlerts.sort((a: any, b: any) => b.triggeredAt - a.triggeredAt);
+
       total = allAlerts.length;
       const startIndex = (page - 1) * limitCount;
       alerts = allAlerts.slice(startIndex, startIndex + limitCount);
@@ -92,9 +95,21 @@ export async function GET(req: NextRequest) {
           totalPages: Math.ceil(total / limitCount) || 1,
         },
       },
-      { headers: { "Cache-Control": "private, no-store" } }
+      { headers: { "Cache-Control": "private, max-age=900" } } // 15 min cache
     );
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    const errorMsg = error.message || String(error);
+    const isQuotaError = errorMsg.includes('429') || errorMsg.includes('Quota') || errorMsg.includes('RESOURCE_EXHAUSTED');
+
+    console.error(`[ALERTS API] ${isQuotaError ? 'QUOTA' : 'ERROR'}: ${errorMsg}`);
+
+    return NextResponse.json(
+      {
+        error: isQuotaError
+          ? 'Firestore quota exceeded. Will reset at 6:30 AM IST (1 AM GMT).'
+          : error.message
+      },
+      { status: isQuotaError ? 503 : 500 }
+    );
   }
 }

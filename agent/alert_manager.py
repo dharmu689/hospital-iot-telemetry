@@ -7,32 +7,52 @@ def get_fs():
     return firestore.client()
 
 def write_alert(patient_id, vitals, violations, ai_result):
-    alert_id = f"alert_{uuid.uuid4().hex[:8]}"
     severity = "critical" if any(v["severity"] == "critical" for v in violations) else "warning"
     ts = int(time.time() * 1000)
 
-    alert = {
-        "alertId": alert_id,
-        "patientId": patient_id,
-        "severity": severity,
-        "message": violations[0]["message"],
-        "triggeredAt": ts,
-        "resolvedAt": None,
-        "isResolved": False,
-        "vitalsAtTrigger": vitals,
-        "aiExplanation": ai_result.get("explanation", ""),
-        "recommendations": ai_result.get("recommendations", []),
-    }
+    # Check if an alert already exists for this patient
+    active_ref = rtdb.reference(f"alerts/{patient_id}/active")
+    existing_alert = active_ref.get()
+
+    if existing_alert and isinstance(existing_alert, dict):
+        # Update existing alert instead of creating a new one
+        alert_id = existing_alert.get("alertId")
+        alert = existing_alert.copy()
+        alert.update({
+            "severity": severity,
+            "message": violations[0]["message"],
+            "updatedAt": ts,
+            "vitalsAtTrigger": vitals,
+            "aiExplanation": ai_result.get("explanation", ""),
+            "recommendations": ai_result.get("recommendations", []),
+        })
+        print(f"[ALERT] UPDATED {severity.upper()} for {patient_id}: {alert['message']}")
+    else:
+        # Create new alert
+        alert_id = f"alert_{uuid.uuid4().hex[:8]}"
+        alert = {
+            "alertId": alert_id,
+            "patientId": patient_id,
+            "severity": severity,
+            "message": violations[0]["message"],
+            "triggeredAt": ts,
+            "resolvedAt": None,
+            "isResolved": False,
+            "vitalsAtTrigger": vitals,
+            "aiExplanation": ai_result.get("explanation", ""),
+            "recommendations": ai_result.get("recommendations", []),
+        }
+        print(f"[ALERT] NEW {severity.upper()} for {patient_id}: {alert['message']}")
 
     # Write to RTDB — immediately visible on dashboard
     rtdb.reference(f"alerts/{patient_id}/active").set(alert)
 
-    # Write to Firestore — permanent history
-    fs = get_fs()
-    fs.collection("patients").document(patient_id)\
-      .collection("alerts").document(alert_id).set(alert)
+    # Write to Firestore — permanent history (only new alerts)
+    if not existing_alert:
+        fs = get_fs()
+        fs.collection("patients").document(patient_id)\
+          .collection("alerts").document(alert_id).set(alert)
 
-    print(f"[ALERT] {severity.upper()} for {patient_id}: {alert['message']}")
     return alert
 
 def resolve_alert(patient_id):

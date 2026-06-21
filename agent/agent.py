@@ -1,6 +1,10 @@
 import time
 import os
+import warnings
 from dotenv import load_dotenv
+
+# Suppress Firestore deprecation warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="google.cloud.firestore_v1")
 
 # Load env BEFORE importing modules that depend on it
 load_dotenv()
@@ -25,8 +29,6 @@ def init_firebase():
 
 init_firebase()
 
-COOLDOWN = 60
-last_alert_time = {}
 in_alert_state = set()
 
 def get_patient_info(patient_id):
@@ -44,17 +46,18 @@ def process_patient(patient_id, vitals):
             print(f"[RESOLVED] {patient_id} vitals normal")
         return
 
-    now = time.time()
-    if now - last_alert_time.get(patient_id, 0) < COOLDOWN:
-        return
-
-    patient_info = get_patient_info(patient_id)
-    print(f"[AI] Analyzing {patient_id}...")
-    ai_result = get_ai_explanation(patient_info, vitals, violations)
-    write_alert(patient_id, vitals, violations, ai_result)
-
-    last_alert_time[patient_id] = now
-    in_alert_state.add(patient_id)
+    # Vitals are in violation — create or update alert
+    if patient_id not in in_alert_state:
+        patient_info = get_patient_info(patient_id)
+        print(f"[AI] Analyzing {patient_id}...")
+        ai_result = get_ai_explanation(patient_info, vitals, violations)
+        write_alert(patient_id, vitals, violations, ai_result)
+        in_alert_state.add(patient_id)
+    else:
+        # Alert already active, just update with new vitals/analysis
+        patient_info = get_patient_info(patient_id)
+        ai_result = get_ai_explanation(patient_info, vitals, violations)
+        write_alert(patient_id, vitals, violations, ai_result)
 
 def run():
     print("AI Agent started. Monitoring RTDB...")

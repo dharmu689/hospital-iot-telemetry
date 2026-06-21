@@ -37,6 +37,7 @@ export default function PatientDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<Partial<Patient>>({});
+  const [triggeringEmergency, setTriggeringEmergency] = useState(false);
 
   const fetchAlerts = useCallback(() => {
     setLoadingAlerts(true);
@@ -176,6 +177,30 @@ export default function PatientDetailPage() {
     }
   };
 
+  const handleTriggerEmergency = async () => {
+    if (!confirm("Trigger an emergency alert for testing? Vitals will spike for 30 seconds.")) return;
+    try {
+      setTriggeringEmergency(true);
+      const res = await fetch("/api/patients/trigger-emergency", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ patientId, vitalType: "random", severity: "critical" }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success("Emergency alert triggered. Vitals will spike for 30 seconds.");
+        invalidateCache(/\/api\/alerts/);
+        setTimeout(() => fetchAlerts(), 2000);
+      } else {
+        toast.error(data.error || "Failed to trigger emergency");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Error triggering emergency");
+    } finally {
+      setTriggeringEmergency(false);
+    }
+  };
+
   if (error) return (
     <div className="flex min-h-[70vh] items-center justify-center p-4">
       <div className="text-center space-y-5 max-w-md p-8 bg-red-950/20 border border-red-900/40 rounded-3xl backdrop-blur-xl shadow-2xl">
@@ -221,9 +246,14 @@ export default function PatientDetailPage() {
               <Edit size={14} /> Edit
             </button>
             {patient.status !== "discharged" && (
-              <button onClick={handleDischarge} className="flex items-center gap-1 bg-yellow-900/40 hover:bg-yellow-600/40 border border-yellow-500/30 text-yellow-400 px-3 py-1.5 rounded-lg text-xs font-bold transition-all">
-                <Archive size={14} /> Discharge
-              </button>
+              <>
+                <button onClick={handleTriggerEmergency} disabled={triggeringEmergency} className="flex items-center gap-1 bg-purple-900/40 hover:bg-purple-600/40 border border-purple-500/30 text-purple-400 px-3 py-1.5 rounded-lg text-xs font-bold transition-all disabled:opacity-50">
+                  <AlertTriangle size={14} /> {triggeringEmergency ? "Triggering..." : "Force Alert"}
+                </button>
+                <button onClick={handleDischarge} className="flex items-center gap-1 bg-yellow-900/40 hover:bg-yellow-600/40 border border-yellow-500/30 text-yellow-400 px-3 py-1.5 rounded-lg text-xs font-bold transition-all">
+                  <Archive size={14} /> Discharge
+                </button>
+              </>
             )}
             <button onClick={handleDelete} className="flex items-center gap-1 bg-red-900/40 hover:bg-red-600/40 border border-red-500/30 text-red-400 px-3 py-1.5 rounded-lg text-xs font-bold transition-all">
               <Trash2 size={14} /> Delete
@@ -383,11 +413,29 @@ export default function PatientDetailPage() {
                       {isExpanded ? <ChevronUp size={16} className="text-gray-500" /> : <ChevronDown size={16} className="text-gray-500" />}
                     </div>
                   </div>
-                  {isExpanded && alert.aiExplanation && (
-                    <div className="px-4 pb-4 pt-2 border-t border-gray-900 bg-gray-950/40">
-                      <p className="text-xs text-gray-400 leading-relaxed italic bg-gray-900/30 p-3 rounded-lg border border-gray-950">
-                        "{alert.aiExplanation}"
-                      </p>
+                  {isExpanded && (alert.aiExplanation || alert.recommendations?.length > 0) && (
+                    <div className="px-4 pb-4 pt-2 border-t border-gray-900 bg-gray-950/40 space-y-3">
+                      {alert.recommendations && alert.recommendations.length > 0 && (
+                        <div className="space-y-2">
+                          <h5 className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Recommendations</h5>
+                          <ul className="space-y-1">
+                            {alert.recommendations.map((rec: any, i: number) => {
+                              const recText = typeof rec === 'string' ? rec : (rec?.text || rec?.description || '');
+                              return recText ? (
+                                <li key={i} className="text-xs text-gray-300 leading-relaxed">• {recText}</li>
+                              ) : null;
+                            })}
+                          </ul>
+                        </div>
+                      )}
+                      {alert.aiExplanation && (
+                        <div className="space-y-2">
+                          <h5 className="text-[10px] font-bold text-purple-400 uppercase tracking-widest">AI Explanation</h5>
+                          <p className="text-xs text-gray-400 leading-relaxed italic bg-gray-900/30 p-3 rounded-lg border border-gray-950">
+                            "{alert.aiExplanation}"
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

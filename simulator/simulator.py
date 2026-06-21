@@ -2,8 +2,13 @@ import json
 import random
 import time
 import os
+import warnings
 from datetime import datetime
 from pathlib import Path
+
+# Suppress Firestore deprecation warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="google.cloud.firestore_v1")
+
 import firebase_admin
 from firebase_admin import credentials, db, firestore
 from dotenv import load_dotenv
@@ -166,21 +171,63 @@ def main():
     rtdb, fs = init_firebase()
     if not rtdb: return
     thresholds = load_thresholds()
-    
+
+    patients_cache = []
+    cache_age = 0
+    quota_cooldown = 0
+
     while True:
         try:
-            patients_ref = fs.collection('patients').where('isSimulated', '==', True).stream()
-            for p in patients_ref:
-                patient_data = p.to_dict()
-                vitals = generate_vitals(p.id, patient_data, thresholds, fs)
-                ts = int(time.time() * 1000)
-                vitals['timestamp'] = ts
-                rtdb.reference(f'vitals/{p.id}/latest').set(vitals)
-                rtdb.reference(f'vitals/{p.id}/stream/{ts}').set(vitals)
-                print(f'Updated {p.id} - HR: {vitals["heartRate"]}, SpO2: {vitals["spo2"]}')
+            # If in quota cooldown, wait before retrying
+            if quota_cooldown > 0:
+                print(f'[QUOTA] Waiting {quota_cooldown}s before retry...')
+                time.sleep(min(quota_cooldown, 10))
+                quota_cooldown = max(0, quota_cooldown - 10)
+                continue
+
+            # Refresh patient list every 60 seconds (reduces queries by 50%)
+            if cache_age > 60 or not patients_cache:
+                try:
+                    print('[DB] Fetching patient list...')
+                    patients_ref = fs.collection('patients').where('isSimulated', '==', True).stream()
+                    patients_cache = [p for p in patients_ref]
+                    cache_age = 0
+                    print(f'[DB] Loaded {len(patients_cache)} simulated patients')
+                except Exception as e:
+                    if '429' in str(e) or 'Quota' in str(e) or 'RESOURCE_EXHAUSTED' in str(e):
+                        print('[QUOTA] Firestore quota exceeded - retrying in 30s')
+                        quota_cooldown = 30
+                        time.sleep(1)
+                        continue
+                    else:
+                        raise
+
+            # Process each patient
+            for p in patients_cache:
+                try:
+                    patient_data = p.to_dict()
+                    vitals = generate_vitals(p.id, patient_data, thresholds, fs)
+                    ts = int(time.time() * 1000)
+                    vitals['timestamp'] = ts
+                    rtdb.reference(f'vitals/{p.id}/latest').set(vitals)
+                    rtdb.reference(f'vitals/{p.id}/stream/{ts}').set(vitals)
+                    print(f'Updated {p.id} - HR: {vitals["heartRate"]}, SpO2: {vitals["spo2"]}')
+                except Exception as e:
+                    if '429' in str(e) or 'Quota' in str(e):
+                        print('[QUOTA] Write quota exceeded')
+                        quota_cooldown = 30
+                        break
+                    else:
+                        print(f'[ERROR] {p.id}: {e}')
+
+            cache_age += 5
             time.sleep(5)
-        except KeyboardInterrupt: break
-        except Exception as e: print(f'Error: {e}'); time.sleep(5)
+        except KeyboardInterrupt:
+            print('[STOP] Simulator stopped')
+            break
+        except Exception as e:
+            print(f'[FATAL] {e}')
+            time.sleep(10)
 
 if __name__ == '__main__':
     main()

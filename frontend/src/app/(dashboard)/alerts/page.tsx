@@ -297,9 +297,12 @@ export default function AlertCenterPage() {
                         </h4>
                         <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-4 space-y-2.5">
                           {alert.recommendations && alert.recommendations.length > 0 ? (
-                            alert.recommendations.map((rec, i) => (
-                              <p key={i} className="text-xs text-gray-300 leading-relaxed">• {rec}</p>
-                            ))
+                            alert.recommendations.map((rec: any, i: number) => {
+                              const recText = typeof rec === 'string' ? rec : (rec?.text || rec?.description || JSON.stringify(rec));
+                              return (
+                                <p key={i} className="text-xs text-gray-300 leading-relaxed">• {recText}</p>
+                              );
+                            })
                           ) : (
                             <p className="text-xs text-gray-600 italic">No recommendations</p>
                           )}

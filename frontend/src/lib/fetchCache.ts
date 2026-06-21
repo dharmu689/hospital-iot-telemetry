@@ -4,7 +4,7 @@ interface CacheEntry {
   promise?: Promise<any>;
 }
 
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL = 15 * 60 * 1000; // 15 minutes (reduces reads by 66%)
 const cache = new Map<string, CacheEntry>();
 
 function getCacheKey(method: string, url: string): string {

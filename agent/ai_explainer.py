@@ -170,11 +170,36 @@ Respond in this exact JSON format:
   "recommendations": ["...", "...", "..."]
 }}"""
 
+    # 0. Try Local/Bare Metal Ollama Server (FREE - smollm or gemma)
+    ollama_url = os.getenv('OLLAMA_API_URL', 'https://ai-ollama.tac-cgcu.xyz')
+    if ollama_url:
+        models_to_try = ["smollm:360m", "gemma:latest"]
+        for model in models_to_try:
+            try:
+                print(f"[AI] Attempting Ollama ({model})...")
+                url = f"{ollama_url}/api/generate"
+                headers = {"Content-Type": "application/json"}
+                payload = {
+                    "model": model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "format": "json"
+                }
+                response = requests.post(url, headers=headers, json=payload, timeout=30)
+                response.raise_for_status()
+                res_json = response.json()
+                text_content = res_json.get("response", "")
+                if text_content:
+                    parsed = json.loads(text_content)
+                    print(f"[AI] SUCCESS using Ollama ({model})")
+                    return parsed
+            except Exception as e:
+                print(f"[AI] Ollama ({model}) error: {e}")
+
     # 1. Try Gemini API if key is present
     gemini_key = os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY')
     if gemini_key:
         try:
-            print("[AI] Attempting Gemini API...")
             url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
             headers = {"Content-Type": "application/json"}
             payload = {
@@ -189,15 +214,15 @@ Respond in this exact JSON format:
             response.raise_for_status()
             res_json = response.json()
             text_content = res_json["candidates"][0]["content"]["parts"][0]["text"]
+            print("[AI] SUCCESS using Gemini API")
             return json.loads(text_content)
-        except Exception as e:
-            print(f"[AI] Gemini API error: {e}")
+        except Exception:
+            pass
 
     # 2. Try OpenAI API if key is present
     openai_key = os.getenv('OPENAI_API_KEY')
-    if openai_key and not openai_key.startswith("sk-proj-your") and "lefGJu" not in openai_key:
+    if openai_key and not openai_key.startswith("sk-proj-your"):
         try:
-            print("[AI] Attempting OpenAI API...")
             from openai import OpenAI
             client = OpenAI(api_key=openai_key)
             response = client.chat.completions.create(
@@ -206,10 +231,11 @@ Respond in this exact JSON format:
                 temperature=0.3,
                 response_format={"type": "json_object"}
             )
+            print("[AI] SUCCESS using OpenAI API")
             return json.loads(response.choices[0].message.content)
-        except Exception as e:
-            print(f"[AI] OpenAI API error: {e}")
+        except Exception:
+            pass
 
     # 3. Fallback to rich, clinical rule-based generation
-    print("[AI] API unavailable or failed. Using Clinical Rule-Based Fallback Generator.")
+    print("[AI] All APIs unavailable. Using Clinical Rule-Based Fallback Generator.")
     return get_fallback_explanation(patient_info, vitals, violations)

@@ -50,20 +50,37 @@ export function AlertNotifier() {
         if (!knownAlerts.current.has(key)) {
           knownAlerts.current.add(key);
 
-          const { message: alertMessage, alertId, severity } = active;
+          const { message: alertMessage, alertId, severity, recommendations = [] } = active;
+
+          // Ensure recommendations are strings
+          const recList = Array.isArray(recommendations)
+            ? recommendations.filter(r => typeof r === 'string' || (typeof r === 'object' && r?.text))
+            : [];
 
           const toastContent = (
-            <div className="flex flex-col gap-2 w-full text-left">
+            <div className="flex flex-col gap-3 w-full text-left max-w-sm">
               <span className="font-bold text-xs uppercase tracking-wider">
                 {severity === "critical" ? "🚨 CRITICAL ALERT" : "⚠️ WARNING ALERT"}
               </span>
-              <span className="text-xs text-gray-300 font-semibold mt-0.5">
+              <span className="text-xs text-gray-300 font-semibold">
                 Patient ID: {patientId}
               </span>
-              <span className="text-xs text-gray-400 mt-1 leading-relaxed">
+              <span className="text-xs text-gray-400 leading-relaxed">
                 {alertMessage}
               </span>
-              <div className="flex justify-end mt-2 pt-1 border-t border-gray-800">
+              {recList.length > 0 && (
+                <div className="bg-gray-900/50 p-2.5 rounded-lg border border-gray-800/50">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase mb-1.5">Recommendations:</p>
+                  <ul className="space-y-1">
+                    {recList.slice(0, 3).map((rec: any, i: number) => (
+                      <li key={i} className="text-[10px] text-gray-300 leading-relaxed">
+                        • {typeof rec === 'string' ? rec : rec?.text || ''}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <div className="flex justify-end mt-1 pt-2 border-t border-gray-800">
                 <button
                   onClick={() => handleResolveFromToast(alertId, patientId)}
                   className="px-2.5 py-1 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white rounded-lg text-[10px] font-extrabold uppercase transition-all cursor-pointer border-0"
@@ -74,11 +91,7 @@ export function AlertNotifier() {
             </div>
           );
 
-          if (severity === "critical") {
-            toast.error(toastContent, { duration: 15000, id: alertId });
-          } else {
-            toast.warning(toastContent, { duration: 10000, id: alertId });
-          }
+          toast.error(toastContent, { duration: 2000, id: alertId });
         }
       }
     });

@@ -58,10 +58,22 @@ export async function GET(req: NextRequest) {
           totalPages: Math.ceil(total / limitCount),
         },
       },
-      { headers: { "Cache-Control": "private, no-store" } }
+      { headers: { "Cache-Control": "private, max-age=900" } } // 15 min cache
     );
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    const errorMsg = error.message || String(error);
+    const isQuotaError = errorMsg.includes('429') || errorMsg.includes('Quota') || errorMsg.includes('RESOURCE_EXHAUSTED');
+
+    console.error(`[PATIENTS API] ${isQuotaError ? 'QUOTA' : 'ERROR'}: ${errorMsg}`);
+
+    return NextResponse.json(
+      {
+        error: isQuotaError
+          ? 'Firestore quota exceeded. Will reset at 6:30 AM IST (1 AM GMT).'
+          : error.message
+      },
+      { status: isQuotaError ? 503 : 500 }
+    );
   }
 }
 
