@@ -6,7 +6,14 @@ rtdb = db
 def get_fs():
     return firestore.client()
 
-def write_alert(patient_id, vitals, violations, ai_result):
+def write_alert(patient_id, vitals, violations, ai_result, should_notify=True):
+    """
+    Write alert to RTDB and Firestore.
+
+    Args:
+        should_notify: If True, frontend will show toast notification.
+                       If False, silently update (during cooldown).
+    """
     severity = "critical" if any(v["severity"] == "critical" for v in violations) else "warning"
     ts = int(time.time() * 1000)
 
@@ -25,8 +32,10 @@ def write_alert(patient_id, vitals, violations, ai_result):
             "vitalsAtTrigger": vitals,
             "aiExplanation": ai_result.get("explanation", ""),
             "recommendations": ai_result.get("recommendations", []),
+            "shouldNotify": should_notify,  # Flag for frontend
         })
-        print(f"[ALERT] UPDATED {severity.upper()} for {patient_id}: {alert['message']}")
+        status = "UPDATED (SILENT)" if not should_notify else "UPDATED"
+        print(f"[ALERT] {status} {severity.upper()} for {patient_id}: {alert['message']}")
     else:
         # Create new alert
         alert_id = f"alert_{uuid.uuid4().hex[:8]}"
@@ -41,6 +50,7 @@ def write_alert(patient_id, vitals, violations, ai_result):
             "vitalsAtTrigger": vitals,
             "aiExplanation": ai_result.get("explanation", ""),
             "recommendations": ai_result.get("recommendations", []),
+            "shouldNotify": should_notify,
         }
         print(f"[ALERT] NEW {severity.upper()} for {patient_id}: {alert['message']}")
 

@@ -47,9 +47,16 @@ export function AlertNotifier() {
         const active = raw[patientId]?.active;
         if (!active) continue;
         const key = `${patientId}_${active.alertId}`;
-        if (!knownAlerts.current.has(key)) {
-          knownAlerts.current.add(key);
 
+        // Check if this is a new alert AND should notify (respects cooldown)
+        const isNewAlert = !knownAlerts.current.has(key);
+        const shouldNotify = active.shouldNotify !== false; // Default to true if not specified
+
+        // Always track this alert (whether we notify or not)
+        knownAlerts.current.add(key);
+
+        // Only show toast if new alert AND should notify
+        if (isNewAlert && shouldNotify) {
           const { message: alertMessage, alertId, severity, recommendations = [] } = active;
 
           // Ensure recommendations are strings

@@ -29,7 +29,10 @@ def init_firebase():
 
 init_firebase()
 
+# Alert state tracking
 in_alert_state = set()
+last_alert_time = {}  # Maps patient_id -> timestamp of last alert notification
+COOLDOWN_PERIOD = 60  # Seconds between alert notifications
 
 def get_patient_info(patient_id):
     fs = firestore.client()
@@ -37,27 +40,46 @@ def get_patient_info(patient_id):
     return doc.to_dict() if doc.exists else {"name": patient_id}
 
 def process_patient(patient_id, vitals):
+    global last_alert_time
     violations = check_vitals(vitals)
+    current_time = time.time()
 
     if not violations:
         if patient_id in in_alert_state:
             resolve_alert(patient_id)
             in_alert_state.discard(patient_id)
+            last_alert_time.pop(patient_id, None)  # Reset cooldown on manual resolution
             print(f"[RESOLVED] {patient_id} vitals normal")
         return
 
-    # Vitals are in violation — create or update alert
+    # Vitals are in violation — check cooldown before alerting
+    time_since_last_alert = current_time - last_alert_time.get(patient_id, 0)
+    in_cooldown = time_since_last_alert < COOLDOWN_PERIOD and patient_id in in_alert_state
+
     if patient_id not in in_alert_state:
+        # First alert for this patient
         patient_info = get_patient_info(patient_id)
         print(f"[AI] Analyzing {patient_id}...")
         ai_result = get_ai_explanation(patient_info, vitals, violations)
-        write_alert(patient_id, vitals, violations, ai_result)
+        write_alert(patient_id, vitals, violations, ai_result, should_notify=True)
         in_alert_state.add(patient_id)
-    else:
-        # Alert already active, just update with new vitals/analysis
+        last_alert_time[patient_id] = current_time
+        print(f"[COOLDOWN] {patient_id} alert notification SENT. Next notification in 60s.")
+    elif in_cooldown:
+        # Within 60-second cooldown — silently update database but don't notify
         patient_info = get_patient_info(patient_id)
         ai_result = get_ai_explanation(patient_info, vitals, violations)
-        write_alert(patient_id, vitals, violations, ai_result)
+        write_alert(patient_id, vitals, violations, ai_result, should_notify=False)
+        remaining = int(COOLDOWN_PERIOD - time_since_last_alert)
+        print(f"[COOLDOWN] {patient_id} silently updating ({remaining}s remaining). No notification.")
+    else:
+        # Outside cooldown period — send new alert notification
+        patient_info = get_patient_info(patient_id)
+        print(f"[AI] Analyzing {patient_id} (cooldown expired)...")
+        ai_result = get_ai_explanation(patient_info, vitals, violations)
+        write_alert(patient_id, vitals, violations, ai_result, should_notify=True)
+        last_alert_time[patient_id] = current_time
+        print(f"[COOLDOWN] {patient_id} alert re-notification SENT. Next notification in 60s.")
 
 def run():
     print("AI Agent started. Monitoring RTDB...")
